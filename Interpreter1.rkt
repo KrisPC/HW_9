@@ -1,0 +1,130 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-advanced-reader.ss" "lang")((modname Interpreter1) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #t #t none #f () #f)))
+; Enviroment Initializers
+(define empty-env
+  (lambda () (list 'empty-env)))
+(define extend-env
+  (lambda (name value env)
+    (list 'extend-env name value env)))
+(define extend-env*
+  (lambda (lon lov env)
+    (cond
+      ((null? lon) env)
+      (else (extend-env* (cdr lon) (cdr lov) (extend-env (car lon) (car lov) env))))))
+(define get-name
+  (lambda (env) (cadr env)))
+(define get-value
+  (lambda (env) (caddr env)))
+(define get-env
+  (lambda (env) (cadddr env)))
+(define empty-env?
+  (lambda (env) (eq? 'empty-env (car env))))
+(define apply-env
+  (lambda (var-name env)
+    (cond
+      ((empty-env? env) #f)
+      (else
+       (if (eq? var-name (get-name env))
+           (get-value env)
+           (apply-env var-name (get-env env)))))))
+(define has-binding?
+  (lambda (var-name env)
+    (not (eq? (apply-env var-name env) #f))))
+(define env (extend-env 'a 5 (extend-env 'b 7 (empty-env))))
+env
+(extend-env* '(c d e) '(1 2 3) env)
+; Grammar Constructors
+(define var-exp
+  (lambda (s)
+    (list 'var-exp s)))
+(define lambda-exp
+  (lambda (s lc-exp)
+    (list 'lambda-exp s lc-exp)))
+(define app-exp
+  (lambda (lambda-exp param-value)
+    (list 'app-exp lambda-exp param-value)))
+; Grammar Extractors
+(define lc-exp->type
+  (lambda (lc-exp)
+    (car lc-exp)))
+(define var-exp->var-name
+  (lambda (var-exp)
+    (cadr var-exp)))
+(define lambda-exp->parameter-name
+  (lambda (lambda-exp)
+    (cadr lambda-exp)))
+(define lambda-exp->body
+  (lambda (lambda-exp)
+    (caddr lambda-exp)))
+(define app-exp->lambda-exp
+  (lambda (app-exp)
+    (cadr app-exp)))
+(define app-exp->parameter-input
+  (lambda (app-exp)
+    (caddr app-exp)))
+; Grammar Predicates
+(define var-exp?
+  (lambda (lc-exp)
+    (eq? (lc-exp->type lc-exp) 'var-exp)))
+(define app-exp?
+  (lambda (lc-exp)
+    (eq? (lc-exp->type lc-exp) 'app-exp)))
+(define lambda-exp?
+  (lambda (lc-exp)
+    (eq? (lc-exp->type lc-exp) 'lambda-exp)))
+; Parse/Unparse
+; (func gets (x) does x)
+; (Run (func (x) x) 'with parameter)
+; (Get-Value 'A)
+;HW 9/29/2020
+;language extractors
+;value extractor
+(define var->value
+  (lambda(var)
+    (cadr var)))
+;func param extractor
+(define func->param
+  (lambda(func)
+    (car(car (cdr(cdr func))))))
+;func body extractor
+(define func->body
+  (lambda (func)
+    (car(cdr(cdr(cdr(cdr func)))))))
+;run funcName extractor
+(define run->functionName
+  (lambda(runStatement)
+    (cadr runStatement)))
+;run  param extractor
+(define run->param
+  (lambda(runStatement)
+    (car(cdr(cdr(cdr runStatement))))))
+(define parse-expression
+  (lambda (c0d3)
+    (cond
+      ((eq? (car c0d3) 'get-value) (var-exp (var->value c0d3)))
+      ((eq? (car c0d3) 'func) (lambda-exp (func->param c0d3) (parse-expression (func->body c0d3))))
+      ((eq? (car c0d3) 'run) (app-exp
+                              (parse-expression (run->functionName c0d3))
+                              (parse-expression (run->param c0d3)))))))
+(define parse-expression-with-extractors
+  (lambda (c0d3)
+    (cond
+      ((eq? (car c0d3) 'get-value) (var-exp (cadr c0d3)))
+      ((eq? (car c0d3) 'func) (lambda-exp (car (car (cdr (cdr c0d3)))) (parse-expression (car (cdr (cdr (cdr (cdr c0d3))))))))
+      ((eq? (car c0d3) 'run) (app-exp
+                              (parse-expression (cadr c0d3))
+                              (parse-expression (cadddr c0d3)))))))
+(define unparse-expression
+  (lambda (lcexp)
+    (cond
+      ((var-exp? lcexp) (list 'get-value (var-exp->var-name lcexp)))
+      ((lambda-exp? lcexp) (list 'func 'gets (list (lambda-exp->parameter-name lcexp)) 'does (unparse-expression (lambda-exp->body lcexp))))
+      ((app-exp? lcexp) (list 'run
+                              (unparse-expression (app-exp->lambda-exp lcexp))
+                              'with
+                              (unparse-expression (app-exp->parameter-input lcexp)))))))
+(define myC0d3 '(run (func gets (a) does (get-value a)) with (get-value c)))
+myC0d3
+(display(unparse-expression (parse-expression myC0d3)))
+(display(unparse-expression (parse-expression-with-extractors myC0d3)))
